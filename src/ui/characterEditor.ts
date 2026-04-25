@@ -1,5 +1,6 @@
+import { characterToBytes, decodeCharacterBytes } from '../c64/encoding';
 import { C64_PALETTE } from '../c64/palette';
-import { CHARACTER_COLUMNS, CHARACTER_ROWS, type MulticolorPixel, type ProjectData } from '../c64/projectModel';
+import { CHARACTER_ROWS, characterColumnsForMode, type CellDisplayMode, type CellPixel, type ProjectData } from '../c64/projectModel';
 import { clearCanvas, drawCharacterC64, drawCharacterLogical, setupCanvas } from './canvasHelpers';
 import { createColorSelect } from './colorSelect';
 import { button } from './toolbar';
@@ -9,14 +10,13 @@ export class CharacterEditor {
   private readonly editorCanvas = document.createElement('canvas');
   private readonly previewCanvas = document.createElement('canvas');
   private readonly cellHeight = 34;
-  private readonly cellWidth = this.cellHeight * 2;
   private isPainting = false;
 
   constructor(
     private getProject: () => ProjectData,
     private getSelectedCharacter: () => number,
-    private getActiveValue: () => MulticolorPixel,
-    private setActiveValue: (value: MulticolorPixel) => void,
+    private getActiveValue: () => CellPixel,
+    private setActiveValue: (value: CellPixel) => void,
     private commit: (label: string, mutator: (project: ProjectData) => void) => void,
     private copyCharacter: () => void,
     private pasteCharacter: () => void,
@@ -49,11 +49,13 @@ export class CharacterEditor {
     tools.append(
       button('Copy', this.copyCharacter),
       button('Paste', this.pasteCharacter),
+      this.modeButton('Multicolour', 'multicolor', selected),
+      this.modeButton('Hi-res', 'hires', selected),
       button('Clear', () => this.commit('clear character', (next) => {
         next.characters[selected].pixels.forEach((row) => row.fill(0));
       })),
       button('Mirror H', () => this.commit('mirror character horizontally', (next) => {
-        next.characters[selected].pixels = next.characters[selected].pixels.map((row) => [...row].reverse() as MulticolorPixel[]);
+        next.characters[selected].pixels = next.characters[selected].pixels.map((row) => [...row].reverse() as CellPixel[]);
       })),
       button('Mirror V', () => this.commit('mirror character vertically', (next) => {
         next.characters[selected].pixels = [...next.characters[selected].pixels].reverse();
@@ -71,12 +73,14 @@ export class CharacterEditor {
 
     const hint = document.createElement('p');
     hint.className = 'hint';
-    hint.textContent = 'Colour RAM visible colours are limited to 0..7; C64 export writes visible colour + 8 for multicolour cells.';
+    hint.textContent = character.mode === 'hires'
+      ? 'Hi-res cells use colour RAM colours 0..7 and draw 8 one-bit pixels per row.'
+      : 'Multicolour cells use colour RAM visible colour + 8 and draw 4 two-bit pixels per row.';
 
     const canvases = document.createElement('div');
     canvases.className = 'editor-canvases';
     const editWrap = document.createElement('div');
-    editWrap.append(this.label('Logical 4x8 edit grid'), this.editorCanvas);
+    editWrap.append(this.label(`Logical ${characterColumnsForMode(character.mode)}x8 edit grid`), this.editorCanvas);
     const previewWrap = document.createElement('div');
     previewWrap.append(this.label('True 8x8 C64 preview'), this.previewCanvas);
     canvases.append(editWrap, previewWrap);
@@ -88,16 +92,32 @@ export class CharacterEditor {
   drawCanvases(): void {
     const project = this.getProject();
     const character = project.characters[this.getSelectedCharacter()];
-    const editWidth = CHARACTER_COLUMNS * this.cellWidth;
+    const cellWidth = this.cellWidth(character.mode);
+    const editWidth = characterColumnsForMode(character.mode) * cellWidth;
     const editHeight = CHARACTER_ROWS * this.cellHeight;
     const editCtx = setupCanvas(this.editorCanvas, editWidth, editHeight);
     clearCanvas(editCtx, editWidth, editHeight);
-    drawCharacterLogical(editCtx, character, project, 0, 0, this.cellWidth, this.cellHeight, true);
+    drawCharacterLogical(editCtx, character, project, 0, 0, cellWidth, this.cellHeight, true);
 
     const previewCtx = setupCanvas(this.previewCanvas, 160, 160);
     previewCtx.fillStyle = '#101010';
     previewCtx.fillRect(0, 0, 160, 160);
     drawCharacterC64(previewCtx, character, project, 16, 16, 16);
+  }
+
+  private modeButton(label: string, mode: CellDisplayMode, selected: number): HTMLButtonElement {
+    const control = button(label, () => {
+      const current = this.getProject().characters[selected];
+      if (current.mode === mode) return;
+      const bytes = characterToBytes(current);
+      this.commit(`set character ${mode} mode`, (next) => {
+        next.characters[selected].mode = mode;
+        next.characters[selected].pixels = decodeCharacterBytes(Array.from(bytes), mode);
+      });
+      if (mode === 'hires' && this.getActiveValue() > 1) this.setActiveValue(1);
+    });
+    control.classList.toggle('selected', this.getProject().characters[selected].mode === mode);
+    return control;
   }
 
   private label(text: string): HTMLDivElement {
@@ -108,10 +128,12 @@ export class CharacterEditor {
   }
 
   private handlePointer(event: PointerEvent): void {
+    const character = this.getProject().characters[this.getSelectedCharacter()];
+    const cellWidth = this.cellWidth(character.mode);
     const rect = this.editorCanvas.getBoundingClientRect();
-    const column = Math.floor((event.clientX - rect.left) / this.cellWidth);
+    const column = Math.floor((event.clientX - rect.left) / cellWidth);
     const row = Math.floor((event.clientY - rect.top) / this.cellHeight);
-    if (column < 0 || column >= CHARACTER_COLUMNS || row < 0 || row >= CHARACTER_ROWS) return;
+    if (column < 0 || column >= characterColumnsForMode(character.mode) || row < 0 || row >= CHARACTER_ROWS) return;
     const selected = this.getSelectedCharacter();
     if (event.button === 2) {
       this.setActiveValue(this.getProject().characters[selected].pixels[row][column]);
@@ -119,10 +141,14 @@ export class CharacterEditor {
     }
     if (event.button !== 0 && event.buttons !== 1) return;
     this.isPainting = true;
-    const value = this.getActiveValue();
+    const value = (character.mode === 'hires' ? Math.min(this.getActiveValue(), 1) : this.getActiveValue()) as CellPixel;
     if (this.getProject().characters[selected].pixels[row][column] === value) return;
     this.commit('paint character pixel', (next) => {
       next.characters[selected].pixels[row][column] = value;
     });
+  }
+
+  private cellWidth(mode: CellDisplayMode): number {
+    return mode === 'hires' ? this.cellHeight : this.cellHeight * 2;
   }
 }

@@ -1,5 +1,6 @@
 import { colorHex } from '../c64/palette';
-import type { CharacterData, ProjectData } from '../c64/projectModel';
+import { characterToBytes, decodeCharacterBytes } from '../c64/encoding';
+import type { CellDisplayMode, CharacterData, ProjectData } from '../c64/projectModel';
 
 export function setupCanvas(canvas: HTMLCanvasElement, width: number, height: number): CanvasRenderingContext2D {
   const scale = window.devicePixelRatio || 1;
@@ -14,8 +15,9 @@ export function setupCanvas(canvas: HTMLCanvasElement, width: number, height: nu
   return ctx;
 }
 
-export function logicalColor(project: ProjectData, character: CharacterData, value: number): string {
+export function logicalColor(project: ProjectData, character: CharacterData, value: number, mode: CellDisplayMode = character.mode): string {
   if (value === 0) return colorHex(project.d021Background);
+  if (mode === 'hires') return colorHex(character.defaultVisibleColor);
   if (value === 1) return colorHex(project.d022Multicolor1);
   if (value === 2) return colorHex(project.d023Multicolor2);
   return colorHex(character.defaultVisibleColor);
@@ -37,7 +39,7 @@ export function drawCharacterLogical(
 ): void {
   character.pixels.forEach((row, rowIndex) => {
     row.forEach((pixel, columnIndex) => {
-      ctx.fillStyle = logicalColor(project, character, pixel);
+      ctx.fillStyle = logicalColor(project, character, pixel, character.mode);
       ctx.fillRect(x + columnIndex * cellWidth, y + rowIndex * cellHeight, cellWidth, cellHeight);
       if (showGrid) {
         ctx.strokeStyle = 'rgba(255,255,255,0.35)';
@@ -54,11 +56,14 @@ export function drawCharacterC64(
   x: number,
   y: number,
   pixelSize: number,
+  mode: CellDisplayMode = character.mode,
 ): void {
-  character.pixels.forEach((row, rowIndex) => {
+  const pixels = mode === character.mode ? character.pixels : decodeCharacterBytes(Array.from(characterToBytes(character)), mode);
+  pixels.forEach((row, rowIndex) => {
     row.forEach((pixel, columnIndex) => {
-      ctx.fillStyle = logicalColor(project, character, pixel);
-      ctx.fillRect(x + columnIndex * pixelSize * 2, y + rowIndex * pixelSize, pixelSize * 2, pixelSize);
+      ctx.fillStyle = logicalColor(project, character, pixel, mode);
+      const width = mode === 'hires' ? pixelSize : pixelSize * 2;
+      ctx.fillRect(x + columnIndex * width, y + rowIndex * pixelSize, width, pixelSize);
     });
   });
 }

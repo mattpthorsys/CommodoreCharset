@@ -12,6 +12,7 @@ export function createColorSelect<T extends C64Color>(
   entries: readonly PaletteEntry[],
   value: T,
   onChange: (value: T) => void,
+  disabled = false,
 ): HTMLElement {
   const wrap = document.createElement('span');
   wrap.className = 'colour-select-wrap';
@@ -20,6 +21,7 @@ export function createColorSelect<T extends C64Color>(
   swatch.className = 'colour-swatch';
 
   const select = document.createElement('select');
+  select.disabled = disabled;
   entries.forEach((entry) => {
     const option = document.createElement('option');
     option.value = String(entry.index);

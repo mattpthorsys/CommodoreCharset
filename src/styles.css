@@ -34,6 +34,13 @@ button.selected {
   border-color: #d8d8d8;
 }
 
+button:disabled,
+select:disabled,
+.disabled-control {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 select,
 input {
   border: 1px solid #575757;

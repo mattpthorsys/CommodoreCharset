@@ -1,4 +1,4 @@
-import type { ProjectData } from '../c64/projectModel';
+import type { CellDisplayMode, ProjectData } from '../c64/projectModel';
 import { drawCharacterC64, setupCanvas } from './canvasHelpers';
 import { button } from './toolbar';
 
@@ -7,6 +7,7 @@ export class TileEditor {
   private readonly editorCanvas = document.createElement('canvas');
   private readonly previewCanvas = document.createElement('canvas');
   private readonly cellSize = 48;
+  private selectedCell = 0;
 
   constructor(
     private getProject: () => ProjectData,
@@ -50,6 +51,10 @@ export class TileEditor {
       })),
     );
 
+    const modeTools = document.createElement('div');
+    modeTools.className = 'tool-row';
+    modeTools.append('Selected cell mode', this.cellModeButton('Multicolour', 'multicolor'), this.cellModeButton('Hi-res', 'hires'));
+
     const canvases = document.createElement('div');
     canvases.className = 'editor-canvases';
     const editWrap = document.createElement('div');
@@ -58,7 +63,7 @@ export class TileEditor {
     previewWrap.append(this.label('Tile preview'), this.previewCanvas);
     canvases.append(editWrap, previewWrap);
 
-    this.element.append(header, dimensions, tools, canvases);
+    this.element.append(header, dimensions, tools, modeTools, canvases);
     this.drawCanvases();
   }
 
@@ -73,12 +78,14 @@ export class TileEditor {
     tile.characterIndexes.forEach((characterIndex, cellIndex) => {
       const x = cellIndex % project.tileWidth;
       const y = Math.floor(cellIndex / project.tileWidth);
-      drawCharacterC64(ctx, project.characters[characterIndex], project, x * this.cellSize + 4, y * this.cellSize + 4, 5);
-      ctx.strokeStyle = '#5a5a5a';
+      const mode = tile.cellModes[cellIndex] ?? project.characters[characterIndex].mode;
+      drawCharacterC64(ctx, project.characters[characterIndex], project, x * this.cellSize + 4, y * this.cellSize + 4, 5, mode);
+      ctx.strokeStyle = cellIndex === this.selectedCell ? '#ffffff' : '#5a5a5a';
       ctx.strokeRect(x * this.cellSize + 0.5, y * this.cellSize + 0.5, this.cellSize - 1, this.cellSize - 1);
       ctx.fillStyle = '#f6f6f6';
       ctx.font = '11px system-ui';
       ctx.fillText(String(characterIndex).padStart(3, '0'), x * this.cellSize + 4, y * this.cellSize + this.cellSize - 5);
+      ctx.fillText(mode === 'hires' ? 'H' : 'M', x * this.cellSize + this.cellSize - 13, y * this.cellSize + this.cellSize - 5);
     });
 
     const previewScale = 10;
@@ -90,7 +97,7 @@ export class TileEditor {
     tile.characterIndexes.forEach((characterIndex, cellIndex) => {
       const x = cellIndex % project.tileWidth;
       const y = Math.floor(cellIndex / project.tileWidth);
-      drawCharacterC64(previewCtx, project.characters[characterIndex], project, x * 8 * previewScale, y * 8 * previewScale, previewScale);
+      drawCharacterC64(previewCtx, project.characters[characterIndex], project, x * 8 * previewScale, y * 8 * previewScale, previewScale, tile.cellModes[cellIndex] ?? project.characters[characterIndex].mode);
     });
   }
 
@@ -117,6 +124,7 @@ export class TileEditor {
     const y = Math.floor((event.clientY - rect.top) / this.cellSize);
     if (x < 0 || y < 0 || x >= project.tileWidth || y >= project.tileHeight) return;
     const cellIndex = y * project.tileWidth + x;
+    this.selectedCell = cellIndex;
     const tileIndex = this.getSelectedTile();
     if (event.shiftKey) {
       this.setSelectedCharacter(project.tiles[tileIndex].characterIndexes[cellIndex]);
@@ -127,5 +135,21 @@ export class TileEditor {
     this.commit('assign tile character', (next) => {
       next.tiles[tileIndex].characterIndexes[cellIndex] = characterIndex;
     });
+  }
+
+  private cellModeButton(label: string, mode: CellDisplayMode): HTMLButtonElement {
+    const control = button(label, () => {
+      const project = this.getProject();
+      const tileIndex = this.getSelectedTile();
+      const tile = project.tiles[tileIndex];
+      if (this.selectedCell >= project.tileWidth * project.tileHeight) this.selectedCell = 0;
+      if (tile.cellModes[this.selectedCell] === mode) return;
+      this.commit('set tile cell mode', (next) => {
+        next.tiles[tileIndex].cellModes[this.selectedCell] = mode;
+      });
+    });
+    const tile = this.getProject().tiles[this.getSelectedTile()];
+    control.classList.toggle('selected', (tile.cellModes[this.selectedCell] ?? 'multicolor') === mode);
+    return control;
   }
 }

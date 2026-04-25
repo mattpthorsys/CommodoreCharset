@@ -1,7 +1,7 @@
 import {
-  CHARACTER_COLUMNS,
   CHARACTER_COUNT,
   CHARACTER_ROWS,
+  characterColumnsForMode,
   TILE_COUNT,
   type ProjectData,
 } from './projectModel';
@@ -21,15 +21,19 @@ export function validateProject(project: ProjectData): string[] {
   if (!Array.isArray(project.tiles) || project.tiles.length !== TILE_COUNT) warnings.push('Project must contain 256 tiles.');
 
   project.characters?.forEach((character, index) => {
+    if (character.mode !== 'multicolor' && character.mode !== 'hires') warnings.push(`Character ${index} mode must be multicolor or hires.`);
     if (!isIntInRange(character.defaultVisibleColor, 0, 7)) warnings.push(`Character ${index} visible colour must be 0..7.`);
     if (!Array.isArray(character.pixels) || character.pixels.length !== CHARACTER_ROWS) {
       warnings.push(`Character ${index} must contain 8 rows.`);
       return;
     }
+    const mode = character.mode === 'hires' ? 'hires' : 'multicolor';
+    const columns = characterColumnsForMode(mode);
+    const maxPixel = mode === 'hires' ? 1 : 3;
     character.pixels.forEach((row, rowIndex) => {
-      if (!Array.isArray(row) || row.length !== CHARACTER_COLUMNS) warnings.push(`Character ${index}, row ${rowIndex} must contain 4 pixels.`);
+      if (!Array.isArray(row) || row.length !== columns) warnings.push(`Character ${index}, row ${rowIndex} must contain ${columns} pixels.`);
       row.forEach((pixel, columnIndex) => {
-        if (!isIntInRange(pixel, 0, 3)) warnings.push(`Character ${index}, row ${rowIndex}, column ${columnIndex} must be 0..3.`);
+        if (!isIntInRange(pixel, 0, maxPixel)) warnings.push(`Character ${index}, row ${rowIndex}, column ${columnIndex} must be 0..${maxPixel}.`);
       });
     });
   });
@@ -42,6 +46,13 @@ export function validateProject(project: ProjectData): string[] {
     }
     tile.characterIndexes.forEach((characterIndex, cellIndex) => {
       if (!isIntInRange(characterIndex, 0, 255)) warnings.push(`Tile ${index}, cell ${cellIndex} must reference character 0..255.`);
+    });
+    if (!Array.isArray(tile.cellModes) || tile.cellModes.length !== tileLength) {
+      warnings.push(`Tile ${index} must contain ${tileLength} cell display modes.`);
+      return;
+    }
+    tile.cellModes.forEach((mode, cellIndex) => {
+      if (mode !== 'multicolor' && mode !== 'hires') warnings.push(`Tile ${index}, cell ${cellIndex} mode must be multicolor or hires.`);
     });
   });
 

@@ -27,7 +27,7 @@ export class TileGrid {
       tile.characterIndexes.forEach((characterIndex, cellIndex) => {
         const cx = cellIndex % project.tileWidth;
         const cy = Math.floor(cellIndex / project.tileWidth);
-        drawCharacterC64(ctx, project.characters[characterIndex], project, x + 4 + cx * 8 * zoom, y + 4 + cy * 8 * zoom, zoom);
+        drawCharacterC64(ctx, project.characters[characterIndex], project, x + 4 + cx * 8 * zoom, y + 4 + cy * 8 * zoom, zoom, tile.cellModes[cellIndex] ?? project.characters[characterIndex].mode);
       });
       ctx.strokeStyle = tileIndex === selectedIndex ? '#ffffff' : '#3a3a3a';
       ctx.lineWidth = tileIndex === selectedIndex ? 2 : 1;

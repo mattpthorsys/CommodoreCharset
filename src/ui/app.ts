@@ -4,12 +4,14 @@ import {
   exportCharacterVisibleColours,
   exportOscar64Header,
   exportProjectJson,
+  exportTileColourRamFlat,
+  exportTileColourRamSeparated,
   exportTilesFlat,
   exportTilesSeparated,
   importProjectJson,
 } from '../c64/exports';
 import { C64_PALETTE } from '../c64/palette';
-import { cloneProject, createNewProject, normalizeTileDimensions, type MulticolorPixel, type ProjectData, type TileDefinition, type CharacterData } from '../c64/projectModel';
+import { cloneProject, createNewProject, normalizeTileDimensions, type CellPixel, type MulticolorPixel, type ProjectData, type TileDefinition, type CharacterData } from '../c64/projectModel';
 import { validateProject } from '../c64/validation';
 import { loadStoredProject, saveStoredProject } from '../storage/localStorage';
 import { CharacterEditor } from './characterEditor';
@@ -29,7 +31,7 @@ export class App {
   private selectedCharacter = 0;
   private selectedTile = 0;
   private tileGridZoom: 1 | 2 | 4 = 2;
-  private activeValue: MulticolorPixel = 3;
+  private activeValue: CellPixel = 3;
   private undoStack: Snapshot[] = [];
   private redoStack: Snapshot[] = [];
   private dirty = false;
@@ -82,7 +84,9 @@ export class App {
         const length = next.tileWidth * next.tileHeight;
         const indexes = this.copiedTile!.characterIndexes.slice(0, length);
         while (indexes.length < length) indexes.push(0);
-        next.tiles[this.selectedTile] = { characterIndexes: indexes };
+        const cellModes = (this.copiedTile!.cellModes ?? []).slice(0, length);
+        while (cellModes.length < length) cellModes.push('multicolor');
+        next.tiles[this.selectedTile] = { characterIndexes: indexes, cellModes };
       });
     },
   );
@@ -120,6 +124,8 @@ export class App {
       button('Colour RAM', () => downloadBlob(`${this.filePrefix()}_character_colour_ram.bin`, exportCharacterColourRamBytes(this.project))),
       button('Tiles Flat', () => downloadBlob(`${this.filePrefix()}_tiles_flat.bin`, exportTilesFlat(this.project))),
       button('Tiles Separated', () => this.exportSeparated()),
+      button('Tile Colour RAM', () => downloadBlob(`${this.filePrefix()}_tile_colour_ram_flat.bin`, exportTileColourRamFlat(this.project))),
+      button('Tile Colour RAM Separated', () => this.exportColourRamSeparated()),
       button('Oscar64 .h', () => downloadBlob(`${this.filePrefix()}_oscar64.h`, exportOscar64Header(this.project), 'text/plain')),
       button('Undo', () => this.undo()),
       button('Redo', () => this.redo()),
@@ -131,18 +137,24 @@ export class App {
     const panel = document.createElement('section');
     panel.className = 'panel palette-panel';
     panel.append(this.globalColourSelect('D021 background', 'd021Background'));
-    panel.append(this.globalColourSelect('D022 multicolour 1', 'd022Multicolor1'));
-    panel.append(this.globalColourSelect('D023 multicolour 2', 'd023Multicolor2'));
+    const selectedMode = this.project.characters[this.selectedCharacter].mode;
+    panel.append(this.globalColourSelect('D022 multicolour 1', 'd022Multicolor1', selectedMode === 'hires'));
+    panel.append(this.globalColourSelect('D023 multicolour 2', 'd023Multicolor2', selectedMode === 'hires'));
 
     const active = document.createElement('div');
     active.className = 'active-values';
-    const labels = ['00 / D021', '01 / D022', '10 / D023', '11 / per-cell'];
+    if (selectedMode === 'hires' && this.activeValue > 1) this.activeValue = 1;
+    const labels = selectedMode === 'hires'
+      ? ['0 / D021', '1 / per-cell', 'D022', 'D023']
+      : ['00 / D021', '01 / D022', '10 / D023', '11 / per-cell'];
     labels.forEach((label, index) => {
       const control = button(label, () => {
+        if (selectedMode === 'hires' && index > 1) return;
         this.activeValue = index as MulticolorPixel;
         this.render();
       });
       control.classList.toggle('selected', this.activeValue === index);
+      control.disabled = selectedMode === 'hires' && index > 1;
       active.append(control);
     });
     panel.append(active);
@@ -205,15 +217,16 @@ export class App {
     return controls;
   }
 
-  private globalColourSelect(label: string, key: 'd021Background' | 'd022Multicolor1' | 'd023Multicolor2'): HTMLElement {
+  private globalColourSelect(label: string, key: 'd021Background' | 'd022Multicolor1' | 'd023Multicolor2', disabled = false): HTMLElement {
     const wrap = document.createElement('label');
     wrap.className = 'colour-control';
+    wrap.classList.toggle('disabled-control', disabled);
     wrap.textContent = `${label} `;
     wrap.append(createColorSelect(C64_PALETTE, this.project[key], (value) => {
       this.commit(`set ${label}`, (next) => {
         next[key] = value as ProjectData[typeof key];
       });
-    }));
+    }, disabled));
     return wrap;
   }
 
@@ -282,6 +295,12 @@ export class App {
 
   private exportSeparated(): void {
     for (const file of exportTilesSeparated(this.project)) {
+      downloadBlob(`${this.filePrefix()}_${file.filename}`, file.bytes);
+    }
+  }
+
+  private exportColourRamSeparated(): void {
+    for (const file of exportTileColourRamSeparated(this.project)) {
       downloadBlob(`${this.filePrefix()}_${file.filename}`, file.bytes);
     }
   }
