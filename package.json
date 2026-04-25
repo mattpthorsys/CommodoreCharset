@@ -1,0 +1,17 @@
+{
+  "name": "commodore-charset",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc && vite build",
+    "test": "tsx tests/encoding.test.ts"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^1.1.0",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.0",
+    "tsx": "^4.7.1"
+  }
+}

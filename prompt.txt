@@ -1,0 +1,549 @@
+I would like to create a local web application for drawing Commodore 64 VIC-II multicolour character sets.
+
+Build this as a straightforward TypeScript web app using Vite, HTML canvas, and simple CSS.
+
+Requirements:
+- No backend.
+- It should run easily on Windows 11 desktop/laptop using normal Node/npm tooling.
+- Keep the code clean, modular, and straightforward to understand.
+- Avoid clever or over-engineered architecture.
+- Store project data locally in the browser.
+- Allow export/import as JSON.
+- The app should be intuitive and simple to use.
+- Include undo/redo support.
+
+The app is specifically for Commodore 64 VIC-II multicolour character mode.
+
+Important C64 graphics rules:
+
+- A C64 character is 8 bytes.
+- Each byte represents one row of the character.
+- In multicolour character mode, each row is interpreted as four 2-bit pixels.
+- Each 2-bit pixel is displayed double-width.
+- Therefore, a character is logically 4x8 multicolour pixels, but appears as an 8x8 screen cell.
+- The 2-bit values map to colours like this:
+
+  00 = background colour register D021
+  01 = multicolour register D022
+  10 = multicolour register D023
+  11 = per-cell colour from colour RAM
+
+- The per-cell visible colour is limited to C64 colour indexes 0..7.
+- Colour RAM values 8..15 enable multicolour character mode for that screen cell.
+- Therefore, when storing/exporting colour RAM values for direct use on the C64, store the selected visible per-cell colour as selectedColour + 8.
+- The charset binary itself must contain only the 2048 bytes of character bitmap data:
+  256 characters * 8 bytes each.
+- Per-character or per-tile colour information is editor/project metadata and should be exported separately from the raw charset binary.
+
+Important distinction: character data vs screen/tile colour data:
+
+- Character bitmap data contains only pixel bit-pair values.
+- Character bitmap data does not contain C64 colour RAM values.
+- On real C64 hardware, colour RAM is per screen character cell, not per character definition.
+- The editor may store a default visible colour per character as metadata.
+- This default colour is useful for previews and exports.
+- When a character is used in a tile or screen map, that placement may eventually have its own colour RAM value.
+- For version 1, use each character's default visible colour for tile previews and colour exports.
+- Because colour RAM is per screen character cell, a 2x2 tile can have up to four different per-cell colours: one for each character cell.
+
+Main app concept:
+
+The application has two main editing areas:
+
+1. Character editor
+2. Tile editor
+
+============================================================
+1. Character editor
+============================================================
+
+The top part of the screen is the character editor.
+
+Features:
+
+- Show all 256 characters in a selectable character grid.
+- When a character is selected, show it enlarged for editing.
+- The editor should show a 4x8 logical multicolour pixel grid.
+- Each editable pixel can have one of four logical values:
+
+  0 = D021 background
+  1 = D022 multicolour 1
+  2 = D023 multicolour 2
+  3 = per-cell colour
+
+- Let the user select the active drawing value from these four logical colour slots.
+- Let the user configure the global C64 colours for:
+  - D021 background colour
+  - D022 multicolour 1
+  - D023 multicolour 2
+
+- Let the user configure a default visible per-character colour for each character.
+- This default visible per-character colour must be limited to C64 colour indexes 0..7.
+- This default per-character colour is editor metadata and is useful for previews and exports, but it is not part of the raw charset bitmap data.
+
+Character editing behaviour:
+
+- Left click paints the selected logical colour value.
+- Right click samples the logical colour value from the clicked pixel.
+- Support click-and-drag painting.
+- Support undo/redo.
+- Support mirror horizontally.
+- Support mirror vertically.
+- Support clear character.
+- Support copy/paste character.
+
+Character preview:
+
+- Provide a logical edit view showing the 4x8 multicolour pixel grid.
+- Provide a C64 display preview where each logical multicolour pixel is displayed double-width, producing an 8x8 preview.
+- The enlarged editor can use square logical cells for ease of editing, but the preview should show the true C64 double-width appearance.
+
+============================================================
+2. Tile editor
+============================================================
+
+The bottom part of the screen is the tile editor.
+
+Features:
+
+- Tiles are composed from character indexes.
+- The default tile size is 2x2 characters.
+- The user can change tile width and height in characters.
+- There are 256 tile definitions.
+- Each tile cell references one of the 256 characters.
+- Tiles may reuse characters.
+
+Tile dimensions:
+
+- A 1x1 character tile is 4x8 logical multicolour pixels and displays as 8x8 normal C64 pixels.
+- A 2x2 character tile is 8x16 logical multicolour pixels and displays as 16x16 normal C64 pixels.
+- A 2x3 character tile is 8x24 logical multicolour pixels and displays as 16x24 normal C64 pixels.
+- In general:
+  - logical multicolour pixel width = tileWidthInChars * 4
+  - logical multicolour pixel height = tileHeightInChars * 8
+  - displayed C64 pixel width = tileWidthInChars * 8
+  - displayed C64 pixel height = tileHeightInChars * 8
+
+Tile editor behaviour:
+
+- Show a selectable list/grid of the 256 tiles.
+- When a tile is selected, show an enlarged editable tile layout.
+- Allow the user to assign character indexes to each cell of the tile.
+- For version 1, this can be done by selecting a character from the character grid and then clicking a tile cell to assign that character.
+- If the user holds Shift and left-clicks a character cell inside a tile, select that character in the main character editor for convenient editing.
+- For preview, each tile cell should use that character's default visible per-character colour.
+- Support copy/paste tile.
+- Support clear tile.
+
+============================================================
+Palette / colour UI
+============================================================
+
+Provide the standard 16-colour Commodore 64 palette.
+
+The palette should contain the normal C64 colour indexes:
+
+0  = black
+1  = white
+2  = red
+3  = cyan
+4  = purple
+5  = green
+6  = blue
+7  = yellow
+8  = orange
+9  = brown
+10 = light red
+11 = dark grey
+12 = grey
+13 = light green
+14 = light blue
+15 = light grey
+
+Allow the user to choose:
+
+- D021 background colour, from 0..15
+- D022 multicolour 1, from 0..15
+- D023 multicolour 2, from 0..15
+
+For each character, allow choosing its default visible per-cell colour from 0..7 only.
+
+Make clear in the UI that colours 8..15 are not available as the per-cell visible colour in multicolour character mode because bit 3 of colour RAM is used to enable multicolour mode.
+
+For direct C64 colour RAM export, the app should export visibleColour + 8, producing values 8..15.
+
+============================================================
+Data model
+============================================================
+
+Use a clear data model.
+
+Suggested TypeScript types:
+
+type C64Color =
+  0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+  8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
+
+type C64VisibleCellColor = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+type MulticolorPixel = 0 | 1 | 2 | 3;
+
+interface CharacterData {
+  pixels: MulticolorPixel[][]; 
+  // 8 rows, 4 columns
+  defaultVisibleColor: C64VisibleCellColor;
+}
+
+interface TileDefinition {
+  characterIndexes: number[];
+  // length = tileWidth * tileHeight
+  // row-major order
+}
+
+interface ProjectData {
+  version: number;
+  d021Background: C64Color;
+  d022Multicolor1: C64Color;
+  d023Multicolor2: C64Color;
+  characters: CharacterData[];
+  tiles: TileDefinition[];
+  tileWidth: number;
+  tileHeight: number;
+}
+
+Validation:
+
+- characters must contain exactly 256 entries.
+- tiles must contain exactly 256 entries.
+- each character must contain 8 rows.
+- each character row must contain 4 logical multicolour pixels.
+- each multicolour pixel must be 0, 1, 2, or 3.
+- defaultVisibleColor must be 0..7.
+- D021/D022/D023 values must be 0..15.
+- tileWidth and tileHeight must be positive integers.
+- each tile must contain tileWidth * tileHeight character indexes.
+- character indexes must be 0..255.
+
+============================================================
+Encoding / decoding
+============================================================
+
+Create utility functions for:
+
+- encodeMulticolorRow(pixels)
+- decodeMulticolorRow(byteValue)
+- encodeCharacter(characterPixels)
+- decodeCharacter(characterBytes)
+- exportCharsetBinary()
+- exportCharacterVisibleColours()
+- exportCharacterColourRamBytes()
+- exportTilesFlat()
+- exportTilesSeparated()
+- exportProjectJson()
+- importProjectJson()
+
+Encoding a row:
+
+- Each character row has four logical multicolour pixels.
+- Each pixel is a 2-bit value.
+- The leftmost pixel goes into bits 7..6.
+- The next pixel goes into bits 5..4.
+- The next pixel goes into bits 3..2.
+- The rightmost pixel goes into bits 1..0.
+
+Example:
+
+function encodeMulticolorRow(pixels: [number, number, number, number]): number {
+  return (
+    ((pixels[0] & 0b11) << 6) |
+    ((pixels[1] & 0b11) << 4) |
+    ((pixels[2] & 0b11) << 2) |
+    ((pixels[3] & 0b11) << 0)
+  );
+}
+
+function decodeMulticolorRow(byteValue: number): [number, number, number, number] {
+  return [
+    (byteValue >> 6) & 0b11,
+    (byteValue >> 4) & 0b11,
+    (byteValue >> 2) & 0b11,
+    byteValue & 0b11,
+  ];
+}
+
+============================================================
+Exports
+============================================================
+
+Add export options suitable for Oscar64 or other C64 tooling.
+
+Required exports:
+
+------------------------------------------------------------
+1. Raw charset binary
+------------------------------------------------------------
+
+- Export a .bin file containing exactly 2048 bytes.
+- Character 0 first, then character 1, and so on through character 255.
+- Each character exports 8 bytes.
+- Each byte encodes four 2-bit pixels:
+  - leftmost pixel in bits 7..6
+  - next pixel in bits 5..4
+  - next pixel in bits 3..2
+  - rightmost pixel in bits 1..0
+- Do not include any file header.
+- Do not include colour information in this file.
+
+------------------------------------------------------------
+2. Character colour data
+------------------------------------------------------------
+
+The editor stores a default visible per-character colour for each of the 256 characters.
+
+This is editor metadata, not part of the raw charset bitmap.
+
+Provide two export options:
+
+A. Visible colour indexes
+
+- Export 256 bytes.
+- One byte per character.
+- Each value is 0..7.
+- This is editor-friendly metadata representing the visible per-cell colour.
+
+B. C64 colour RAM bytes for multicolour mode
+
+- Export 256 bytes.
+- One byte per character.
+- Each value is visibleColour + 8, therefore 8..15.
+- These values can be written directly to C64 colour RAM for screen cells using these characters.
+- Make clear in comments/UI that colour RAM is per screen cell.
+- This export is a convenience based on each character's default visible colour.
+
+------------------------------------------------------------
+3. Tile definitions, flat format
+------------------------------------------------------------
+
+- Export tile character indexes in row-major order.
+- For example, for 2x2 tiles:
+
+  tile 0 top-left
+  tile 0 top-right
+  tile 0 bottom-left
+  tile 0 bottom-right
+  tile 1 top-left
+  tile 1 top-right
+  tile 1 bottom-left
+  tile 1 bottom-right
+  and so on.
+
+- This should adapt to different tile widths/heights.
+- Export as a raw .bin file containing one byte per tile cell.
+- Each byte is a character index from 0..255.
+
+------------------------------------------------------------
+4. Tile definitions, separated-plane format
+------------------------------------------------------------
+
+- Export one file per tile cell position.
+- For 2x2 tiles, export four files:
+  - tile_x0_y0.bin = top-left character indexes for all tiles
+  - tile_x1_y0.bin = top-right character indexes for all tiles
+  - tile_x0_y1.bin = bottom-left character indexes for all tiles
+  - tile_x1_y1.bin = bottom-right character indexes for all tiles
+
+- For other tile dimensions, generate one file per x/y tile-cell position.
+- Name files clearly:
+  - tile_x0_y0.bin
+  - tile_x1_y0.bin
+  - tile_x0_y1.bin
+  - tile_x1_y1.bin
+  etc.
+
+- Each separated file should contain 256 bytes:
+  one character index for each of the 256 tile definitions.
+
+------------------------------------------------------------
+5. Project JSON
+------------------------------------------------------------
+
+Export/import the full editor project:
+
+- charset pixel data
+- D021/D022/D023 colour selections
+- default visible per-character colours
+- tile definitions
+- tile width and height
+- any editor metadata
+- project version
+
+Use a version field so the format can evolve later.
+
+------------------------------------------------------------
+6. Oscar64-friendly C/C++ export
+------------------------------------------------------------
+
+Also provide optional .h or .c text export containing arrays such as:
+
+unsigned char charsetData[2048]
+unsigned char characterVisibleColours[256]
+unsigned char characterColourRamBytes[256]
+unsigned char tileMapFlat[]
+unsigned char tilePlane_x0_y0[]
+unsigned char tilePlane_x1_y0[]
+unsigned char tilePlane_x0_y1[]
+unsigned char tilePlane_x1_y1[]
+
+Requirements:
+
+- Use hexadecimal byte values.
+- Include array lengths in comments.
+- Keep this output simple and readable.
+
+============================================================
+Local storage
+============================================================
+
+- Save the current project automatically to browser local storage.
+- Add manual Save Project JSON and Load Project JSON buttons.
+- Add New Project button.
+- Before clearing/replacing a project, ask for confirmation if there are unsaved changes.
+
+============================================================
+User interface
+============================================================
+
+Keep the UI simple.
+
+Suggested layout:
+
+Top toolbar:
+- New project
+- Load project JSON
+- Save project JSON
+- Export charset binary
+- Export character colour data
+- Export tiles flat
+- Export tiles separated
+- Export C/Oscar64 header
+- Undo
+- Redo
+
+Palette panel:
+- D021 selector
+- D022 selector
+- D023 selector
+- active drawing value selector:
+  - 00 / D021
+  - 01 / D022
+  - 10 / D023
+  - 11 / per-cell colour
+
+Character editor area:
+- 256-character grid
+- enlarged 4x8 logical editor
+- true C64 8x8 preview
+- default visible per-character colour selector, limited to 0..7
+- copy character
+- paste character
+- clear character
+- mirror horizontal
+- mirror vertical
+
+Tile editor area:
+- 256-tile grid/list
+- tile width input
+- tile height input
+- enlarged tile layout editor
+- tile preview
+- copy tile
+- paste tile
+- clear tile
+
+Status area:
+- selected character index
+- selected tile index
+- tile size
+- character usage count if practical
+- validation warnings if any
+
+============================================================
+Implementation guidance
+============================================================
+
+- Keep the code modular.
+- Separate C64 encoding/decoding logic from UI components.
+- Separate rendering code from data model code.
+- Use canvas for rendering/editing pixel grids.
+- Add comments explaining the C64 multicolour character mode rules.
+- Include basic validation.
+- Avoid large dependencies unless truly needed.
+- Do not use a backend.
+- Do not add authentication.
+- Do not add cloud sync.
+- Prefer clarity over cleverness.
+
+Suggested file structure:
+
+src/
+  main.ts
+  styles.css
+  c64/
+    palette.ts
+    encoding.ts
+    projectModel.ts
+    validation.ts
+    exports.ts
+  ui/
+    app.ts
+    characterEditor.ts
+    characterGrid.ts
+    tileEditor.ts
+    tileGrid.ts
+    toolbar.ts
+    canvasHelpers.ts
+  storage/
+    localStorage.ts
+
+============================================================
+Testing / validation
+============================================================
+
+Add simple tests or self-check functions for the encoding logic.
+
+At minimum, verify:
+
+- encodeMulticolorRow([0, 0, 0, 0]) returns 0x00
+- encodeMulticolorRow([3, 3, 3, 3]) returns 0xFF
+- encodeMulticolorRow([0, 1, 2, 3]) returns 0x1B
+- decodeMulticolorRow(0x1B) returns [0, 1, 2, 3]
+- a full charset export is exactly 2048 bytes
+- visible colour export is exactly 256 bytes
+- colour RAM export is exactly 256 bytes and contains values 8..15
+- tile separated export for 2x2 produces four 256-byte files
+- tile flat export for 2x2 produces 1024 bytes because 256 tiles * 4 character indexes
+
+============================================================
+Done when
+============================================================
+
+The app is complete enough when:
+
+- I can draw all 256 characters.
+- I can set D021, D022, and D023.
+- I can set a default visible per-character colour from 0..7.
+- I can create/edit 256 tile definitions.
+- I can edit 2x2 tiles by default.
+- I can change tile dimensions.
+- I can assign characters to tile cells.
+- I can Shift+click a tile cell to select that character in the character editor.
+- I can export a valid 2048-byte charset binary.
+- I can export visible character colour data.
+- I can export C64 colour RAM-compatible character colour data using values 8..15.
+- I can export tile definitions in flat format.
+- I can export tile definitions in separated-plane format.
+- I can save and reload a project as JSON.
+- The app runs locally on Windows 11 using npm install and npm run dev.
+- The code is clean and understandable.
+
+Please first create a short implementation plan, then implement the application. After implementation, explain how to run it locally and list the files created or changed.
