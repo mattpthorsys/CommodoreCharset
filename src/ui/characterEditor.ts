@@ -8,7 +8,8 @@ export class CharacterEditor {
   readonly element = document.createElement('section');
   private readonly editorCanvas = document.createElement('canvas');
   private readonly previewCanvas = document.createElement('canvas');
-  private readonly cellSize = 34;
+  private readonly cellHeight = 34;
+  private readonly cellWidth = this.cellHeight * 2;
   private isPainting = false;
 
   constructor(
@@ -87,11 +88,11 @@ export class CharacterEditor {
   drawCanvases(): void {
     const project = this.getProject();
     const character = project.characters[this.getSelectedCharacter()];
-    const editWidth = CHARACTER_COLUMNS * this.cellSize;
-    const editHeight = CHARACTER_ROWS * this.cellSize;
+    const editWidth = CHARACTER_COLUMNS * this.cellWidth;
+    const editHeight = CHARACTER_ROWS * this.cellHeight;
     const editCtx = setupCanvas(this.editorCanvas, editWidth, editHeight);
     clearCanvas(editCtx, editWidth, editHeight);
-    drawCharacterLogical(editCtx, character, project, 0, 0, this.cellSize, true);
+    drawCharacterLogical(editCtx, character, project, 0, 0, this.cellWidth, this.cellHeight, true);
 
     const previewCtx = setupCanvas(this.previewCanvas, 160, 160);
     previewCtx.fillStyle = '#101010';
@@ -108,8 +109,8 @@ export class CharacterEditor {
 
   private handlePointer(event: PointerEvent): void {
     const rect = this.editorCanvas.getBoundingClientRect();
-    const column = Math.floor((event.clientX - rect.left) / this.cellSize);
-    const row = Math.floor((event.clientY - rect.top) / this.cellSize);
+    const column = Math.floor((event.clientX - rect.left) / this.cellWidth);
+    const row = Math.floor((event.clientY - rect.top) / this.cellHeight);
     if (column < 0 || column >= CHARACTER_COLUMNS || row < 0 || row >= CHARACTER_ROWS) return;
     const selected = this.getSelectedCharacter();
     if (event.button === 2) {

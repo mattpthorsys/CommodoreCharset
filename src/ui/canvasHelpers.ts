@@ -31,16 +31,17 @@ export function drawCharacterLogical(
   project: ProjectData,
   x: number,
   y: number,
-  cellSize: number,
+  cellWidth: number,
+  cellHeight: number,
   showGrid: boolean,
 ): void {
   character.pixels.forEach((row, rowIndex) => {
     row.forEach((pixel, columnIndex) => {
       ctx.fillStyle = logicalColor(project, character, pixel);
-      ctx.fillRect(x + columnIndex * cellSize, y + rowIndex * cellSize, cellSize, cellSize);
+      ctx.fillRect(x + columnIndex * cellWidth, y + rowIndex * cellHeight, cellWidth, cellHeight);
       if (showGrid) {
         ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-        ctx.strokeRect(x + columnIndex * cellSize + 0.5, y + rowIndex * cellSize + 0.5, cellSize, cellSize);
+        ctx.strokeRect(x + columnIndex * cellWidth + 0.5, y + rowIndex * cellHeight + 0.5, cellWidth, cellHeight);
       }
     });
   });
