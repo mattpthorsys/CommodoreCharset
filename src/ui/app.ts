@@ -17,6 +17,7 @@ import { loadStoredProject, saveStoredProject } from '../storage/localStorage';
 import { CharacterEditor } from './characterEditor';
 import { CharacterGrid } from './characterGrid';
 import { createColorSelect } from './colorSelect';
+import { MapEditor } from './mapEditor';
 import { TileEditor } from './tileEditor';
 import { TileGrid } from './tileGrid';
 import { button, downloadBlob, filePicker } from './toolbar';
@@ -28,6 +29,7 @@ interface Snapshot {
 
 export class App {
   private project = loadStoredProject();
+  private activePanel: 'tileset' | 'map' = 'tileset';
   private selectedCharacter = 0;
   private selectedTile = 0;
   private tileGridZoom: 1 | 2 | 4 = 2;
@@ -90,6 +92,11 @@ export class App {
       });
     },
   );
+  private readonly mapEditor = new MapEditor(
+    () => this.project,
+    (label, mutator) => this.commit(label, mutator),
+    () => this.filePrefix(),
+  );
 
   constructor(private readonly root: HTMLElement) {
     window.addEventListener('beforeunload', (event) => {
@@ -104,10 +111,19 @@ export class App {
     this.root.innerHTML = '';
     const shell = document.createElement('div');
     shell.className = 'app-shell';
-    shell.append(this.renderToolbar(), this.renderPalettePanel(), this.renderMainEditors(), this.renderStatus());
+    shell.append(this.renderToolbar(), this.renderTabs());
+    if (this.activePanel === 'tileset') {
+      shell.append(this.renderPalettePanel(), this.renderMainEditors());
+    } else {
+      this.mapEditor.render();
+      shell.append(this.mapEditor.element);
+    }
+    shell.append(this.renderStatus());
     this.root.append(shell);
-    this.characterGrid.render(this.project, this.selectedCharacter);
-    this.tileGrid.render(this.project, this.selectedTile, this.tileGridZoom);
+    if (this.activePanel === 'tileset') {
+      this.characterGrid.render(this.project, this.selectedCharacter);
+      this.tileGrid.render(this.project, this.selectedTile, this.tileGridZoom);
+    }
   }
 
   private renderToolbar(): HTMLElement {
@@ -131,6 +147,23 @@ export class App {
       button('Redo', () => this.redo()),
     );
     return toolbar;
+  }
+
+  private renderTabs(): HTMLElement {
+    const tabs = document.createElement('nav');
+    tabs.className = 'editor-tabs';
+    const tileset = button('Characters & Tiles', () => {
+      this.activePanel = 'tileset';
+      this.render();
+    });
+    const map = button('Map Editor', () => {
+      this.activePanel = 'map';
+      this.render();
+    });
+    tileset.classList.toggle('selected', this.activePanel === 'tileset');
+    map.classList.toggle('selected', this.activePanel === 'map');
+    tabs.append(tileset, map);
+    return tabs;
   }
 
   private renderPalettePanel(): HTMLElement {
@@ -181,7 +214,7 @@ export class App {
     status.className = 'status';
     const usage = this.project.tiles.reduce((count, tile) => count + tile.characterIndexes.filter((index) => index === this.selectedCharacter).length, 0);
     const warnings = validateProject(this.project);
-    status.textContent = `${this.project.projectName || 'Untitled Charset'} | Character ${this.selectedCharacter} | Tile ${this.selectedTile} | Tile size ${this.project.tileWidth}x${this.project.tileHeight} | Character usage ${usage} | ${warnings.length ? warnings[0] : 'Project valid'}`;
+    status.textContent = `${this.project.projectName || 'Untitled Charset'} | Character ${this.selectedCharacter} | Tile ${this.selectedTile} | Tile size ${this.project.tileWidth}x${this.project.tileHeight} | Map ${this.project.map.width}x${this.project.map.height} x ${this.project.map.rooms.length} room(s) | Character usage ${usage} | ${warnings.length ? warnings[0] : 'Project valid'}`;
     return status;
   }
 

@@ -1,5 +1,5 @@
 import { encodeHiresRow, encodeMulticolorRow, decodeHiresRow, decodeMulticolorRow, exportCharsetBinary } from '../src/c64/encoding';
-import { exportCharacterColourRamBytes, exportCharacterVisibleColours, exportTileColourRamFlat, exportTilesFlat, exportTilesSeparated } from '../src/c64/exports';
+import { exportCharacterColourRamBytes, exportCharacterVisibleColours, exportMapFlat, exportMapJson, importMapJson, exportTileColourRamFlat, exportTilesFlat, exportTilesSeparated } from '../src/c64/exports';
 import { createNewProject } from '../src/c64/projectModel';
 
 const project = createNewProject();
@@ -42,5 +42,8 @@ const separated = exportTilesSeparated(project);
 assertEqual(separated.length, 4, '2x2 separated export file count');
 assertOk(separated.every((file) => file.bytes.length === 256), 'separated tile files are 256 bytes');
 assertEqual(exportTilesFlat(project).length, 1024, '2x2 flat tile export length');
+assertEqual(exportMapFlat(project.map).length, 1000, 'default 40x25 single-room map export length');
+project.map.rooms[0].tileIndexes[0] = 12;
+assertEqual(importMapJson(exportMapJson(project.map)).rooms[0].tileIndexes[0], 12, 'map json round-trips tile placement');
 
 console.log('encoding/export tests passed');

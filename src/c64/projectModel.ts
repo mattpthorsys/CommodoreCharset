@@ -17,6 +17,16 @@ export interface TileDefinition {
   cellModes: CellDisplayMode[];
 }
 
+export interface MapRoomData {
+  tileIndexes: number[];
+}
+
+export interface MapData {
+  width: number;
+  height: number;
+  rooms: MapRoomData[];
+}
+
 export interface ProjectData {
   version: number;
   projectName: string;
@@ -27,15 +37,19 @@ export interface ProjectData {
   tiles: TileDefinition[];
   tileWidth: number;
   tileHeight: number;
+  map: MapData;
 }
 
-export const PROJECT_VERSION = 2;
+export const PROJECT_VERSION = 3;
 export const CHARACTER_COUNT = 256;
 export const TILE_COUNT = 256;
 export const CHARACTER_ROWS = 8;
 export const MULTICOLOR_CHARACTER_COLUMNS = 4;
 export const HIRES_CHARACTER_COLUMNS = 8;
 export const DEFAULT_CELL_MODE: CellDisplayMode = 'multicolor';
+export const DEFAULT_MAP_WIDTH = 40;
+export const DEFAULT_MAP_HEIGHT = 25;
+export const DEFAULT_MAP_ROOMS = 1;
 
 export function characterColumnsForMode(mode: CellDisplayMode): number {
   return mode === 'hires' ? HIRES_CHARACTER_COLUMNS : MULTICOLOR_CHARACTER_COLUMNS;
@@ -57,6 +71,18 @@ export function createBlankTile(width: number, height: number): TileDefinition {
   };
 }
 
+export function createBlankMapRoom(width: number, height: number): MapRoomData {
+  return { tileIndexes: Array.from({ length: width * height }, () => 0) };
+}
+
+export function createBlankMap(width = DEFAULT_MAP_WIDTH, height = DEFAULT_MAP_HEIGHT, rooms = DEFAULT_MAP_ROOMS): MapData {
+  return {
+    width,
+    height,
+    rooms: Array.from({ length: rooms }, () => createBlankMapRoom(width, height)),
+  };
+}
+
 export function createNewProject(): ProjectData {
   return {
     version: PROJECT_VERSION,
@@ -68,11 +94,27 @@ export function createNewProject(): ProjectData {
     tiles: Array.from({ length: TILE_COUNT }, () => createBlankTile(2, 2)),
     tileWidth: 2,
     tileHeight: 2,
+    map: createBlankMap(),
   };
 }
 
 export function cloneProject(project: ProjectData): ProjectData {
   return JSON.parse(JSON.stringify(project)) as ProjectData;
+}
+
+export function normalizeMapDimensions(project: ProjectData, width: number, height: number, rooms: number): ProjectData {
+  const next = cloneProject(project);
+  next.map.width = width;
+  next.map.height = height;
+  const length = width * height;
+  const normalizedRooms = next.map.rooms.slice(0, rooms).map((room) => {
+    const tileIndexes = room.tileIndexes.slice(0, length);
+    while (tileIndexes.length < length) tileIndexes.push(0);
+    return { tileIndexes };
+  });
+  while (normalizedRooms.length < rooms) normalizedRooms.push(createBlankMapRoom(width, height));
+  next.map.rooms = normalizedRooms;
+  return next;
 }
 
 export function normalizeTileDimensions(project: ProjectData, width: number, height: number): ProjectData {

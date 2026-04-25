@@ -3,13 +3,16 @@ import {
   CHARACTER_ROWS,
   DEFAULT_CELL_MODE,
   CHARACTER_COUNT,
+  PROJECT_VERSION,
   TILE_COUNT,
   characterColumnsForMode,
+  createBlankMap,
   createBlankCharacter,
   createBlankTile,
   type CellDisplayMode,
   type CharacterData,
   type C64VisibleCellColor,
+  type MapData,
   type ProjectData,
 } from './projectModel';
 
@@ -46,6 +49,25 @@ export function exportTilesSeparated(project: ProjectData): NamedBinaryExport[] 
     }
   }
   return files;
+}
+
+export function exportMapFlat(map: MapData): Uint8Array {
+  return Uint8Array.from(map.rooms.flatMap((room) => room.tileIndexes));
+}
+
+export function exportMapRoomsSeparated(map: MapData): NamedBinaryExport[] {
+  return map.rooms.map((room, index) => ({
+    filename: `map_room_${String(index).padStart(2, '0')}.bin`,
+    bytes: Uint8Array.from(room.tileIndexes),
+  }));
+}
+
+export function exportMapJson(map: MapData): string {
+  return JSON.stringify(normalizeMap(map), null, 2);
+}
+
+export function importMapJson(text: string): MapData {
+  return normalizeMap(JSON.parse(text) as Partial<MapData>);
 }
 
 export function exportTileColourRamFlat(project: ProjectData): Uint8Array {
@@ -125,7 +147,7 @@ function normalizeProject(source: Partial<ProjectData>): ProjectData {
     return tile;
   });
   return {
-    version: 2,
+    version: PROJECT_VERSION,
     projectName: typeof source.projectName === 'string' ? source.projectName : 'Untitled Charset',
     d021Background: source.d021Background ?? 0,
     d022Multicolor1: source.d022Multicolor1 ?? 14,
@@ -134,7 +156,24 @@ function normalizeProject(source: Partial<ProjectData>): ProjectData {
     tiles,
     tileWidth: width,
     tileHeight: height,
+    map: normalizeMap(source.map),
   } as ProjectData;
+}
+
+function normalizeMap(source: Partial<MapData> | undefined): MapData {
+  const width = Number.isInteger(source?.width) && source!.width! > 0 ? Math.min(source!.width!, 255) : 40;
+  const height = Number.isInteger(source?.height) && source!.height! > 0 ? Math.min(source!.height!, 255) : 25;
+  const sourceRooms = Array.isArray(source?.rooms) && source!.rooms!.length > 0 ? source!.rooms! : createBlankMap(width, height, 1).rooms;
+  const length = width * height;
+  return {
+    width,
+    height,
+    rooms: sourceRooms.map((room) => {
+      const tileIndexes = Array.isArray(room.tileIndexes) ? room.tileIndexes.slice(0, length).map((value) => Number(value) || 0) : [];
+      while (tileIndexes.length < length) tileIndexes.push(0);
+      return { tileIndexes: tileIndexes.map((value) => Math.max(0, Math.min(255, value))) };
+    }),
+  };
 }
 
 function formatHexArray(bytes: Uint8Array, indent = '  '): string {
@@ -159,6 +198,7 @@ export function exportOscar64Header(project: ProjectData): string {
     cArray('characterColourRamBytes', exportCharacterColourRamBytes(project)),
     cArray('tileMapFlat', exportTilesFlat(project)),
     cArray('tileColourRamFlat', exportTileColourRamFlat(project)),
+    cArray('screenMapFlat', exportMapFlat(project.map)),
   ];
 
   for (const file of exportTilesSeparated(project)) {
@@ -169,7 +209,11 @@ export function exportOscar64Header(project: ProjectData): string {
     const name = file.filename.replace('.bin', '').replace(/[^a-zA-Z0-9_]/g, '_');
     pieces.push(cArray(`tileColourRamPlane_${name.replace(/^tile_colour_ram_/, '')}`, file.bytes));
   }
+  for (const file of exportMapRoomsSeparated(project.map)) {
+    const name = file.filename.replace('.bin', '').replace(/[^a-zA-Z0-9_]/g, '_');
+    pieces.push(cArray(name, file.bytes));
+  }
 
-  pieces.push(`// tile count: ${TILE_COUNT}, character count: ${CHARACTER_COUNT}, tile size: ${project.tileWidth}x${project.tileHeight}`);
+  pieces.push(`// tile count: ${TILE_COUNT}, character count: ${CHARACTER_COUNT}, tile size: ${project.tileWidth}x${project.tileHeight}, map size: ${project.map.width}x${project.map.height}, rooms: ${project.map.rooms.length}`);
   return `${pieces.join('\n\n')}\n`;
 }

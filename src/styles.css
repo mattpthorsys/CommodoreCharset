@@ -76,6 +76,12 @@ input {
   z-index: 5;
 }
 
+.editor-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .palette-panel {
   display: flex;
   flex-wrap: wrap;
@@ -129,6 +135,35 @@ input {
   gap: 0.75rem;
 }
 
+.map-editor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.map-editor-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 392px) minmax(360px, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.map-selector-panel {
+  max-height: 70vh;
+}
+
+.map-room-panel {
+  min-width: 0;
+}
+
+.map-scroll {
+  overflow: auto;
+  max-height: 70vh;
+  max-width: 100%;
+  border: 1px solid #555;
+  background: #111;
+}
+
 .grid-panel,
 .panel {
   padding: 0.75rem;
@@ -157,11 +192,18 @@ h2 {
 .character-grid,
 .pixel-editor,
 .preview-canvas,
-.tile-editor-canvas {
+.tile-editor-canvas,
+.map-tile-selector,
+.map-canvas {
   display: block;
   max-width: 100%;
   border: 1px solid #555;
   background: #111;
+}
+
+.map-canvas {
+  max-width: none;
+  border: 0;
 }
 
 .tile-grid {
@@ -214,6 +256,10 @@ input[type='number'] {
 
 @media (max-width: 760px) {
   .editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .map-editor-layout {
     grid-template-columns: 1fr;
   }
 

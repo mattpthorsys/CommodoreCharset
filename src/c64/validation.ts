@@ -17,6 +17,10 @@ export function validateProject(project: ProjectData): string[] {
   if (!isIntInRange(project.d023Multicolor2, 0, 15)) warnings.push('D023 must be 0..15.');
   if (!Number.isInteger(project.tileWidth) || project.tileWidth < 1) warnings.push('Tile width must be a positive integer.');
   if (!Number.isInteger(project.tileHeight) || project.tileHeight < 1) warnings.push('Tile height must be a positive integer.');
+  if (!project.map || typeof project.map !== 'object') warnings.push('Project must contain map data.');
+  if (project.map && (!Number.isInteger(project.map.width) || project.map.width < 1)) warnings.push('Map width must be a positive integer.');
+  if (project.map && (!Number.isInteger(project.map.height) || project.map.height < 1)) warnings.push('Map height must be a positive integer.');
+  if (project.map && (!Array.isArray(project.map.rooms) || project.map.rooms.length < 1)) warnings.push('Map must contain at least one room.');
   if (!Array.isArray(project.characters) || project.characters.length !== CHARACTER_COUNT) warnings.push('Project must contain 256 characters.');
   if (!Array.isArray(project.tiles) || project.tiles.length !== TILE_COUNT) warnings.push('Project must contain 256 tiles.');
 
@@ -53,6 +57,17 @@ export function validateProject(project: ProjectData): string[] {
     }
     tile.cellModes.forEach((mode, cellIndex) => {
       if (mode !== 'multicolor' && mode !== 'hires') warnings.push(`Tile ${index}, cell ${cellIndex} mode must be multicolor or hires.`);
+    });
+  });
+
+  const mapLength = (project.map?.width ?? 0) * (project.map?.height ?? 0);
+  project.map?.rooms?.forEach((room, roomIndex) => {
+    if (!Array.isArray(room.tileIndexes) || room.tileIndexes.length !== mapLength) {
+      warnings.push(`Map room ${roomIndex} must contain ${mapLength} tile indexes.`);
+      return;
+    }
+    room.tileIndexes.forEach((tileIndex, cellIndex) => {
+      if (!isIntInRange(tileIndex, 0, 255)) warnings.push(`Map room ${roomIndex}, cell ${cellIndex} must reference tile 0..255.`);
     });
   });
 
