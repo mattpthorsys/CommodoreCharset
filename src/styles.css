@@ -1,0 +1,107 @@
+:root {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #e4e8f5;
+  background: #0d1016;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 12px;
+}
+
+button,
+select,
+input {
+  background: #1a2030;
+  color: #e4e8f5;
+  border: 1px solid #3a455f;
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.palette-panel,
+.panel {
+  border: 1px solid #2e3440;
+  border-radius: 8px;
+  padding: 8px;
+  background: #11161f;
+}
+
+.palette-panel {
+  margin-bottom: 12px;
+}
+
+.layout {
+  display: grid;
+  gap: 12px;
+}
+
+.split-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.control-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.label-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.panel-canvas,
+.editor-canvas {
+  border: 1px solid #2f3547;
+  image-rendering: pixelated;
+  background: #0c1119;
+}
+
+.canvas-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.status,
+.validation {
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  background: #11161f;
+  border: 1px solid #2e3440;
+  font-size: 14px;
+}
+
+.validation.error {
+  border-color: #c66;
+  color: #ffb0b0;
+}
+
+.hint {
+  font-size: 12px;
+  color: #b5bfd8;
+}
+
+h3 {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
