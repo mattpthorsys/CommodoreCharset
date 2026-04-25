@@ -14,6 +14,7 @@ import { validateProject } from '../c64/validation';
 import { loadStoredProject, saveStoredProject } from '../storage/localStorage';
 import { CharacterEditor } from './characterEditor';
 import { CharacterGrid } from './characterGrid';
+import { createColorSelect } from './colorSelect';
 import { TileEditor } from './tileEditor';
 import { TileGrid } from './tileGrid';
 import { button, downloadBlob, filePicker } from './toolbar';
@@ -27,6 +28,7 @@ export class App {
   private project = loadStoredProject();
   private selectedCharacter = 0;
   private selectedTile = 0;
+  private tileGridZoom: 1 | 2 | 4 = 2;
   private activeValue: MulticolorPixel = 3;
   private undoStack: Snapshot[] = [];
   private redoStack: Snapshot[] = [];
@@ -101,22 +103,24 @@ export class App {
     shell.append(this.renderToolbar(), this.renderPalettePanel(), this.renderMainEditors(), this.renderStatus());
     this.root.append(shell);
     this.characterGrid.render(this.project, this.selectedCharacter);
-    this.tileGrid.render(this.project, this.selectedTile);
+    this.tileGrid.render(this.project, this.selectedTile, this.tileGridZoom);
   }
 
   private renderToolbar(): HTMLElement {
     const toolbar = document.createElement('header');
     toolbar.className = 'toolbar';
+    const projectName = this.projectNameInput();
     toolbar.append(
+      projectName,
       button('New Project', () => this.newProject()),
       button('Load JSON', () => this.loadJson()),
-      button('Save JSON', () => downloadBlob('c64-project.json', exportProjectJson(this.project), 'application/json')),
-      button('Export Charset', () => downloadBlob('charset.bin', exportCharsetBinary(this.project))),
-      button('Visible Colours', () => downloadBlob('character-visible-colours.bin', exportCharacterVisibleColours(this.project))),
-      button('Colour RAM', () => downloadBlob('character-colour-ram.bin', exportCharacterColourRamBytes(this.project))),
-      button('Tiles Flat', () => downloadBlob('tiles-flat.bin', exportTilesFlat(this.project))),
+      button('Save JSON', () => downloadBlob(`${this.filePrefix()}.json`, exportProjectJson(this.project), 'application/json')),
+      button('Export Charset', () => downloadBlob(`${this.filePrefix()}_charset.bin`, exportCharsetBinary(this.project))),
+      button('Visible Colours', () => downloadBlob(`${this.filePrefix()}_character_visible_colours.bin`, exportCharacterVisibleColours(this.project))),
+      button('Colour RAM', () => downloadBlob(`${this.filePrefix()}_character_colour_ram.bin`, exportCharacterColourRamBytes(this.project))),
+      button('Tiles Flat', () => downloadBlob(`${this.filePrefix()}_tiles_flat.bin`, exportTilesFlat(this.project))),
       button('Tiles Separated', () => this.exportSeparated()),
-      button('Oscar64 .h', () => downloadBlob('c64_charset_export.h', exportOscar64Header(this.project), 'text/plain')),
+      button('Oscar64 .h', () => downloadBlob(`${this.filePrefix()}_oscar64.h`, exportOscar64Header(this.project), 'text/plain')),
       button('Undo', () => this.undo()),
       button('Redo', () => this.redo()),
     );
@@ -154,7 +158,7 @@ export class App {
     this.characterEditor.render();
     const tileSide = document.createElement('section');
     tileSide.className = 'grid-panel';
-    tileSide.append(this.heading('Tiles'), this.tileGrid.canvas);
+    tileSide.append(this.heading('Tiles'), this.renderTileZoomControls(), this.tileGrid.canvas);
     this.tileEditor.render();
     main.append(characterSide, this.characterEditor.element, tileSide, this.tileEditor.element);
     return main;
@@ -165,29 +169,51 @@ export class App {
     status.className = 'status';
     const usage = this.project.tiles.reduce((count, tile) => count + tile.characterIndexes.filter((index) => index === this.selectedCharacter).length, 0);
     const warnings = validateProject(this.project);
-    status.textContent = `Character ${this.selectedCharacter} | Tile ${this.selectedTile} | Tile size ${this.project.tileWidth}x${this.project.tileHeight} | Character usage ${usage} | ${warnings.length ? warnings[0] : 'Project valid'}`;
+    status.textContent = `${this.project.projectName || 'Untitled Charset'} | Character ${this.selectedCharacter} | Tile ${this.selectedTile} | Tile size ${this.project.tileWidth}x${this.project.tileHeight} | Character usage ${usage} | ${warnings.length ? warnings[0] : 'Project valid'}`;
     return status;
+  }
+
+  private projectNameInput(): HTMLLabelElement {
+    const label = document.createElement('label');
+    label.className = 'project-name-control';
+    label.textContent = 'Project ';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = this.project.projectName || 'Untitled Charset';
+    input.addEventListener('change', () => {
+      const name = input.value.trim() || 'Untitled Charset';
+      this.commit('set project name', (next) => {
+        next.projectName = name;
+      });
+    });
+    label.append(input);
+    return label;
+  }
+
+  private renderTileZoomControls(): HTMLElement {
+    const controls = document.createElement('div');
+    controls.className = 'tile-zoom-controls';
+    controls.append('Preview ');
+    ([1, 2, 4] as const).forEach((zoom) => {
+      const control = button(`${zoom}x`, () => {
+        this.tileGridZoom = zoom;
+        this.render();
+      });
+      control.classList.toggle('selected', this.tileGridZoom === zoom);
+      controls.append(control);
+    });
+    return controls;
   }
 
   private globalColourSelect(label: string, key: 'd021Background' | 'd022Multicolor1' | 'd023Multicolor2'): HTMLElement {
     const wrap = document.createElement('label');
     wrap.className = 'colour-control';
     wrap.textContent = `${label} `;
-    const select = document.createElement('select');
-    C64_PALETTE.forEach((entry) => {
-      const option = document.createElement('option');
-      option.value = String(entry.index);
-      option.textContent = `${entry.index} ${entry.name}`;
-      select.append(option);
-    });
-    select.value = String(this.project[key]);
-    select.addEventListener('change', () => {
-      const value = Number(select.value);
+    wrap.append(createColorSelect(C64_PALETTE, this.project[key], (value) => {
       this.commit(`set ${label}`, (next) => {
         next[key] = value as ProjectData[typeof key];
       });
-    });
-    wrap.append(select);
+    }));
     return wrap;
   }
 
@@ -240,6 +266,7 @@ export class App {
     if (this.dirty && !window.confirm('Replace the current project with the selected JSON file?')) return;
     filePicker('.json,application/json', (text) => {
       const imported = importProjectJson(text);
+      imported.projectName = imported.projectName || 'Untitled Charset';
       const warnings = validateProject(imported);
       if (warnings.length) {
         window.alert(`Project JSON is invalid:\n${warnings.slice(0, 6).join('\n')}`);
@@ -255,8 +282,17 @@ export class App {
 
   private exportSeparated(): void {
     for (const file of exportTilesSeparated(this.project)) {
-      downloadBlob(file.filename, file.bytes);
+      downloadBlob(`${this.filePrefix()}_${file.filename}`, file.bytes);
     }
+  }
+
+  private filePrefix(): string {
+    const safeName = (this.project.projectName || 'Untitled Charset')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    return safeName || 'c64_project';
   }
 
   private setTileSize(width: number, height: number): void {

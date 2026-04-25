@@ -9,6 +9,7 @@ export function loadStoredProject(): ProjectData {
   if (!stored) return createNewProject();
   try {
     const project = importProjectJson(stored);
+    project.projectName = project.projectName || 'Untitled Charset';
     return validateProject(project).length === 0 ? project : createNewProject();
   } catch {
     return createNewProject();

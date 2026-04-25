@@ -14,6 +14,7 @@ export interface TileDefinition {
 
 export interface ProjectData {
   version: number;
+  projectName: string;
   d021Background: C64Color;
   d022Multicolor1: C64Color;
   d023Multicolor2: C64Color;
@@ -43,7 +44,8 @@ export function createBlankTile(width: number, height: number): TileDefinition {
 export function createNewProject(): ProjectData {
   return {
     version: PROJECT_VERSION,
-    d021Background: 6,
+    projectName: 'Untitled Charset',
+    d021Background: 0,
     d022Multicolor1: 14,
     d023Multicolor2: 3,
     characters: Array.from({ length: CHARACTER_COUNT }, () => createBlankCharacter()),

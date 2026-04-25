@@ -12,6 +12,7 @@ export function validateProject(project: ProjectData): string[] {
     Number.isInteger(value) && Number(value) >= min && Number(value) <= max;
 
   if (!isIntInRange(project.d021Background, 0, 15)) warnings.push('D021 must be 0..15.');
+  if (project.projectName !== undefined && typeof project.projectName !== 'string') warnings.push('Project name must be text.');
   if (!isIntInRange(project.d022Multicolor1, 0, 15)) warnings.push('D022 must be 0..15.');
   if (!isIntInRange(project.d023Multicolor2, 0, 15)) warnings.push('D023 must be 0..15.');
   if (!Number.isInteger(project.tileWidth) || project.tileWidth < 1) warnings.push('Tile width must be a positive integer.');
